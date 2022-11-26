@@ -1,5 +1,6 @@
 #include "my_arp.h"
 #include <assert.h>
+#include <linux/if_ether.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -98,17 +99,17 @@ void craft_arp_reply(uint8_t* request_buf, uint8_t* reply_buf)
 
     // set source MAC and IP to random Value;
     
-    arp_reply->ar_sha[0] = 122;
-    arp_reply->ar_sha[1] = 122;
-    arp_reply->ar_sha[2] = 122;
-    arp_reply->ar_sha[3] = 122;
-    arp_reply->ar_sha[4] = 122;
-    arp_reply->ar_sha[5] = 122;
+    arp_reply->ar_sha[0] = 1;
+    arp_reply->ar_sha[1] = 1;
+    arp_reply->ar_sha[2] = 1;
+    arp_reply->ar_sha[3] = 1;
+    arp_reply->ar_sha[4] = 1;
+    arp_reply->ar_sha[5] = 1;
 
-    arp_reply->ar_sip[0] = 122;
-    arp_reply->ar_sip[1] = 122;
-    arp_reply->ar_sip[2] = 122;
-    arp_reply->ar_sip[3] = 122;
+    arp_reply->ar_sip[0] = arp->ar_tip[0];
+    arp_reply->ar_sip[1] = arp->ar_tip[1];
+    arp_reply->ar_sip[2] = arp->ar_tip[2];
+    arp_reply->ar_sip[3] = arp->ar_tip[3];
 
     //set target ip to adn MAC to itself
 
@@ -127,12 +128,12 @@ void craft_arp_reply(uint8_t* request_buf, uint8_t* reply_buf)
     // set source and target of ethernet frame
 
     struct ethhdr *eth_reply = (struct ethhdr *)(reply_buf);
-    eth_reply->h_source[0] = 122;
-    eth_reply->h_source[1] = 122;
-    eth_reply->h_source[2] = 122;
-    eth_reply->h_source[3] = 122;
-    eth_reply->h_source[4] = 122;
-    eth_reply->h_source[5] = 122;
+    eth_reply->h_source[0] = 1;
+    eth_reply->h_source[1] = 1;
+    eth_reply->h_source[2] = 1;
+    eth_reply->h_source[3] = 1;
+    eth_reply->h_source[4] = 1;
+    eth_reply->h_source[5] = 1;
 
     eth_reply->h_dest[0] = eth->h_source[0];
     eth_reply->h_dest[1] = eth->h_source[1];
@@ -162,19 +163,23 @@ int main(int argc, char** argv)
     tun_fd = tun_alloc(dev);
 
     int s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
+    if (s == -1)
+        printf("couldnt open socket\n");
 
     struct sockaddr_ll socket_address;
     socket_address.sll_family = AF_PACKET;
     socket_address.sll_protocol = htons(ETH_P_ARP);
     socket_address.sll_ifindex = if_nametoindex(dev);
-    socket_address.sll_hatype = ARPHRD_ETHER;
-    socket_address.sll_pkttype = PACKET_OTHERHOST;
-    socket_address.sll_halen = 6;
-    socket_address.sll_addr[6] = 0x00;
-    socket_address.sll_addr[7] = 0x00;
+    // socket_address.sll_hatype = htons(ARPHRD_ETHER);
+    // socket_address.sll_pkttype = PACKET_HOST;
+    // socket_address.sll_halen = ETH_ALEN;
+    // socket_address.sll_addr[6] = 0x00;
+    // socket_address.sll_addr[7] = 0x00;
 
-    if (s == -1)
-        printf("couldnt open socket\n");
+    if((bind(s, (struct sockaddr *)&socket_address, sizeof(socket_address)))== -1)
+    {
+        printf("couldnt bind");
+    }
 
     int running = 1;
     uint8_t buf[BUFLEN];
@@ -201,17 +206,8 @@ int main(int argc, char** argv)
         craft_arp_reply(buf, arp_reply_buf);
         print_arp_info(arp_reply_buf);
 
-        struct ethhdr *eth = (struct ethhdr *)(buf);
 
-        socket_address.sll_addr[0] = eth->h_dest[0];
-        socket_address.sll_addr[1] = eth->h_dest[1];
-        socket_address.sll_addr[2] = eth->h_dest[2];
-        socket_address.sll_addr[3] = eth->h_dest[3];
-        socket_address.sll_addr[4] = eth->h_dest[4];
-        socket_address.sll_addr[5] = eth->h_dest[5];
-
-
-        int ret = sendto(s,arp_reply_buf, 42, 0,(struct sockaddr *) &socket_address, sizeof(socket_address));
+        int ret = write(s,arp_reply_buf, 42);
 
         if (ret == -1)
         {
