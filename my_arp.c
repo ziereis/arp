@@ -1,24 +1,15 @@
 #include "my_arp.h"
 #include <assert.h>
-#include <linux/if_ether.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include <net/if_arp.h>
 #include <linux/if_tun.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <net/ethernet.h>
-#include <netinet/ip.h>
-#include <inttypes.h>
-#include <limits.h>
 #include <arpa/inet.h>
-#include <sys/socket.h>
 #include <linux/if_packet.h>
 
 
@@ -162,25 +153,6 @@ int main(int argc, char** argv)
 
     tun_fd = tun_alloc(dev);
 
-    int s = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ARP));
-    if (s == -1)
-        printf("couldnt open socket\n");
-
-    struct sockaddr_ll socket_address;
-    socket_address.sll_family = AF_PACKET;
-    socket_address.sll_protocol = htons(ETH_P_ARP);
-    socket_address.sll_ifindex = if_nametoindex(dev);
-    // socket_address.sll_hatype = htons(ARPHRD_ETHER);
-    // socket_address.sll_pkttype = PACKET_HOST;
-    // socket_address.sll_halen = ETH_ALEN;
-    // socket_address.sll_addr[6] = 0x00;
-    // socket_address.sll_addr[7] = 0x00;
-
-    if((bind(s, (struct sockaddr *)&socket_address, sizeof(socket_address)))== -1)
-    {
-        printf("couldnt bind");
-    }
-
     int running = 1;
     uint8_t buf[BUFLEN];
 
@@ -207,7 +179,7 @@ int main(int argc, char** argv)
         print_arp_info(arp_reply_buf);
 
 
-        int ret = write(s,arp_reply_buf, 42);
+        int ret = write(tun_fd,arp_reply_buf, 42);
 
         if (ret == -1)
         {
